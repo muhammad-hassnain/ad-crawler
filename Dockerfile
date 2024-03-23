@@ -1,36 +1,54 @@
-# For more information, please refer to https://aka.ms/vscode-docker-python
+# Start with a Python 3.11 slim image based on Debian Buster
 FROM python:3.11-slim-buster
 
 
-# Set current directory as ENV
-ENV PATH=/crawler:$PATH
+# Set an environment variable to ensure Python output is set straight
+# to the terminal without buffering it first
+ENV PYTHONUNBUFFERED=1
 
 
-# Install dependencies
+# Create and set the working directory inside the container
 WORKDIR /crawler
-COPY requirements.txt ./requirements.txt
-RUN python3.11 -m pip install --upgrade pip
-RUN pip install -r requirements.txt
 
 
-# Virtual Display
-RUN apt update
-RUN apt install -y tigervnc-standalone-server default-jre wget
+# Copy the requirements file into the container and install Python dependencies
+COPY requirements.txt /crawler/
+RUN python -m pip install --upgrade pip && \
+   pip install -r requirements.txt
 
 
-# Install chrome
-RUN wget http://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb
-RUN apt install -y ./google-chrome-stable_114.0.5735.198-1_amd64.deb unzip
+# Install system dependencies required for a virtual display and Chrome
+# This includes installing Xvfb, TigerVNC, and other necessary packages
+RUN apt-get update && \
+   apt-get install -y --no-install-recommends \
+   xvfb \
+   tigervnc-standalone-server \
+   tigervnc-common \
+   fluxbox \
+   wget \
+   gnupg2 \
+   ca-certificates \
+   && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+   && apt install -y ./google-chrome-stable_current_amd64.deb \
+   && rm ./google-chrome-stable_current_amd64.deb \
+   && apt-get clean \
+   && rm -rf /var/lib/apt/lists/*
 
 
-# Download chromedriver
-# RUN wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
-# RUN unzip chromedriver_linux64.zip
+# Copy your application code, the `data` directory, and any other necessary files into the Docker image
+COPY . /crawler/
 
 
-# Copying required items
-COPY ad-crawler.py ./ad-crawler.py
-# ADD code ./code
-# ADD consent-extension ./consent-extension
-# ADD data ./data
-# ADD output ./output
+# Expose the VNC port, adjust if your setup uses a different port
+EXPOSE 1212
+
+
+# Set the PATH environment variable to include the directory where your scripts are located
+ENV PATH="/crawler:${PATH}"
+
+
+# Command to run when starting the container
+CMD Xvfb :99 -screen 0 1024x768x16 & \
+   DISPLAY=:99 \
+   x11vnc -display :99 -N -forever -rfbport 1212 & \
+   python3.11 ad-crawler.py -p "Test" -px "8022" -c "/crawler/chrome-profile" -mp "/crawler"
