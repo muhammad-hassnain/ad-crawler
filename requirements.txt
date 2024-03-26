@@ -38,3 +38,4 @@ webdriver-manager==4.0.1
 websockets==11.0.3
 wsproto==1.2.0
 zope.interface==6.0
+Flask
