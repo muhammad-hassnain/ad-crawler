@@ -78,8 +78,6 @@ def parseArguments():
 	args = parser.parse_args()
 	return args
 
-
-
 # Function to open the URL and set a flag when done
 def open_url(url, driver, done_flag):
 	print(time.time(), "Started")
@@ -90,8 +88,6 @@ def open_url(url, driver, done_flag):
 	finally:
 		done_flag.set()
 
-
-
 def handle_popups(cpm_obj, driver, pop_flag):
 	try:
 		cpm_obj.managePopups(driver)
@@ -99,8 +95,6 @@ def handle_popups(cpm_obj, driver, pop_flag):
 		print(f"Error handling popups: {e}")
 	finally:
 		pop_flag.set()
-
-
 
 def handle_consent(cpm_obj, driver, consent_flag):
 	try:
@@ -110,19 +104,16 @@ def handle_consent(cpm_obj, driver, consent_flag):
 	finally:
 		consent_flag.set()
 	
-
-
 def readHeaderBiddingSites():
 	global ROOT_DIRECTORY;
 	filepath = os.path.join(ROOT_DIRECTORY, "data", "hb_domains.csv")
 	df_hb = pd.read_csv(filepath)
 	return {str(df_hb.iloc[i]["tranco_domain"]): int(df_hb.iloc[i]["tranco_rank"]) for i in range(len(df_hb)) if bool(df_hb.iloc[i]["hb_status"])}
 
-
 def getChromeOptionsObject():
 	global ROOT_DIRECTORY;
 	chrome_options = Options()
-	chrome_options.binary_location = "/usr/bin/google-chrome-stable"
+	# chrome_options.binary_location = "/usr/bin/google-chrome-stable"
 	# chrome_options.add_argument("--headless")
 	# chrome_options.add_argument("--disable-gpu")
 	# chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -159,7 +150,6 @@ def getChromeOptionsObject():
 	chrome_options.add_argument("--lang=en")
 	return chrome_options
 
-
 def exploreFullPage(webdriver_):
 	'''
 	Scroll to bottom and back up to the top for all ads to load and become viewable
@@ -180,7 +170,6 @@ def exploreFullPage(webdriver_):
 	sleep(6)
 	return
 
-
 def configureProxy(profile_name, profile_dir):
 	# Instantiate chromedriver options
 	chrome_options = getChromeOptionsObject()
@@ -190,7 +179,6 @@ def configureProxy(profile_name, profile_dir):
 	chrome_options.add_argument("--profile-directory=%s" % profile_name)
 	
 	return chrome_options
-
 
 def killBrowsermobproxyInstances():
 	for process in psutil.process_iter():
@@ -203,7 +191,6 @@ def killBrowsermobproxyInstances():
 		except psutil.NoSuchProcess:
 			pass
 	return
-
 
 # Function to perform bot mitigation techniques
 def perform_bot_mitigation(driver):
@@ -270,8 +257,6 @@ def perform_bot_mitigation(driver):
 	
 	return
 
-
-
 def main(args):
 
 	global ROOT_DIRECTORY, DOCKER;
@@ -299,7 +284,41 @@ def main(args):
 		options.add_argument(f"user-data-dir={chrome_profile_dir}")
 		options.add_argument("--no-sandbox") # This option is often necessary in containerized environments
 		options.add_argument("--disable-dev-shm-usage") # Overcomes limited resource problems
+		# options.add_argument("--remote-debugging-port=9222")
+		# options.add_argument("--window-size=1536,864")
+		# options.add_argument("--start-maximized")
+		options.add_argument("--disable-infobars")
+		options.add_argument("--disable-notifications")
+		options.add_argument("--disable-popup-blocking")
+		options.add_argument("--ignore-certificate-errors")
+		options.add_argument("--disable-blink-features=AutomationControlled")
+		extension_dir = os.path.join(ROOT_DIRECTORY, "consent-extension", "Consent-O-Matic", "Extension")
+		options.add_argument('--load-extension={}'.format(extension_dir))
+		prefs = {
+			"translate_whitelists": {"lt": "en"},
+			"translate_whitelists": {"fr": "en"},
+			"translate_whitelists": {"ro": "en"},
+			"translate_whitelists": {"pl": "en"},
+			"translate_whitelists": {"de": "en"},
+			"translate_whitelists": {"hu": "en"},
+			"translate_whitelists": {"sr": "en"},
+			"translate_whitelists": {"cs": "en"},
+			"translate_whitelists": {"cz": "en"},
+			"translate_whitelists": {"sk": "en"},
+			"translate_whitelists": {"es": "en"},
+			"translate_whitelists": {"da": "en"},
+			"translate_whitelists": {"pt": "en"},
+			"translate":{"enabled": True}
+		}
+		options.add_experimental_option("prefs", prefs)
+		options.add_argument("--lang=en")
+	
 		driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+		# Example usage
+		# ROOT_DIRECTORY = "/path/to/your/root/directory"  # Set this to the directory containing your extension
+		# chrome_options = get_configured_chrome_options(user_data_dir=chrome_profile_dir)
+		# driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 		inject_start_button(driver)
 		while driver.title != 'startCrawlClicked':
