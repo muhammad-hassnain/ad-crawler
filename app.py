@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template_string, redirect, url_for
 import subprocess
+import os
 
 app = Flask(__name__)
 
@@ -21,14 +22,20 @@ def form():
 def start_crawler():
     profile_name = request.form['profile_name']
     port = request.form['port']
+    profile_dir = f"/root/.config/google-chrome/{profile_name}"
+    if not os.path.exists(profile_dir):
+        print("making the directory")
+        os.makedirs(profile_dir)
     cmd = [
         "python3.11", "ad-crawler.py",
         "-p", profile_name,
         "-px", port,
-        "-c", "/crawler/chrome-profile",
+        "-c", profile_dir,
         "-mp", "/crawler"
     ]
-    subprocess.Popen(cmd)  # Starts the crawler in a non-blocking way
+    # Add logging here to confirm cmd
+    print(f"Starting crawler with command: {' '.join(cmd)}")
+    subprocess.Popen(cmd)
     return redirect(url_for('form'))
 
 if __name__ == '__main__':

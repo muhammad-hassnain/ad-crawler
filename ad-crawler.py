@@ -37,7 +37,33 @@ DOCKER = True
 
 ROOT_DIRECTORY = os.getcwd()
 
+def inject_start_button(driver):
+    # Load a blank page
+    driver.get("about:blank")
 
+    # Create a button element
+    button_script = """
+    var btn = document.createElement('button');
+    btn.id = 'startCrawlButton';
+    btn.innerText = 'Start Crawling';
+    btn.style.position = 'fixed';
+    btn.style.top = '50%';
+    btn.style.left = '50%';
+    btn.style.transform = 'translate(-50%, -50%)';
+    btn.style.padding = '10px 20px';
+    btn.style.fontSize = '20px';
+    document.body.appendChild(btn);
+    """
+    driver.execute_script(button_script)
+    
+    # Attach an event listener to the button
+    click_listener_script = """
+    document.getElementById('startCrawlButton').addEventListener('click', function() {
+        console.log('Button clicked, changing title.');
+        document.title = 'startCrawlClicked';
+    });
+    """
+    driver.execute_script(click_listener_script)
 
 def parseArguments():
 	global ROOT_DIRECTORY;
@@ -266,19 +292,33 @@ def main(args):
 		# kill -9 $(ps aux | grep '[c]hrome' | awk '{print $2}')
 		# ps aux | grep chrome
 		# driver = uc.Chrome(service=Service(ChromeDriverManager().install()), version_main=114, options=configureProxy(profile, chrome_profile_dir)) #executable_path=‘chromedriver’ #114
-		driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=configureProxy(profile, chrome_profile_dir))
-		sleep(15)
+		
+		# driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=configureProxy(profile, chrome_profile_dir))
+		
+		options = Options()
+		options.add_argument(f"user-data-dir={chrome_profile_dir}")
+		options.add_argument("--no-sandbox") # This option is often necessary in containerized environments
+		options.add_argument("--disable-dev-shm-usage") # Overcomes limited resource problems
+		driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+		inject_start_button(driver)
+		while driver.title != 'startCrawlClicked':
+			# print("I am waiting")
+			time.sleep(1)
+		# print('i am done waiting')
+		# sleep(15)
 		driver.refresh()
 	except BaseException as error:
 		print("Chromedriver loading issue: " + str(error))
 		exit()
+
 	print("\nChromedriver successfully loaded!")
 
 	for iteration in [1, 2, 3]:
 		for idx, (hb_domain, hb_rank) in enumerate(hb_dict.items()):
 			
-			if iteration >= 3 and hb_domain == "google.com":
-				continue
+			# if iteration >= 3 and hb_domain == "google.com":
+			# 	continue
 
 			# if iteration == 1 and idx < 13:
 			# 	continue
@@ -316,7 +356,7 @@ def main(args):
 	
 			# Visit the current domain
 			current_time = time.time()
-			website = "http://" + str(hb_domain)
+			website = "https://" + str(hb_domain)
 			try:
 				print("Website:", website)
 				# driver.get(website)
@@ -358,8 +398,8 @@ def main(args):
 			print("Visiting and loading webpage ...")
 			logger.write("\nVisiting and loading webpage ... [Time: {}]".format(time.time()-current_time))
 			
-			if hb_domain == "google.com":
-				sleep(300)
+			# if hb_domain == "google.com":
+			# 	sleep(300)
 			
 			
 			# Read custom popup handling rules
@@ -439,15 +479,13 @@ def main(args):
 			# cpm.managePopups(driver)
 			logger.write("\nPopup-Consent-2 handled! [Time: {}]".format(time.time()-current_time))
 	
-			
-			# Read filterlist rules
 			'''
+			# Read filterlist rules
 			f = open(os.path.join(ROOT_DIRECTORY, "data", "EasyList", "easylist.txt"), "r")
 			rules = f.read().split("\n")
 			f.close()
 			rules = [rule[2:] for rule in rules[18:] if rule.startswith("##")]
 			'''
-	
 	
 			# Save DOM of the webpage
 			current_time = time.time()
@@ -485,8 +523,8 @@ def main(args):
 			print("Fullpage screenshot of the webpage captured")
 	
 			
+			'''			
 			# Collect ads on the website
-			'''
 			print("Starting to collect ads ...")
 			ad_path = os.path.join(experimental_path, "ads")
 			if not(os.path.exists(ad_path)):
