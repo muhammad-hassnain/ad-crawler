@@ -193,7 +193,7 @@ def killBrowsermobproxyInstances():
 	return
 
 # Function to perform bot mitigation techniques
-def perform_bot_mitigation(driver):
+def perform_bot_mitigation(driver, profile, hb_domain, hb_rank, experimental_path, iteration, logger):
 	
 	# Bot mitigation 1: Move mouse randomly around a number of times
 	print("Performing Bot Mitigation 1")
@@ -224,6 +224,12 @@ def perform_bot_mitigation(driver):
 			scroll_count += 1
 			if scroll_count > SCROLL_MAX:
 				break;
+			if scroll_count%5 == 0:
+				# Perform bid collection
+				bid_file_path = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_bids.json")
+				bid_object = BidCollector(profile, hb_domain, hb_rank, bid_file_path)
+				bid_object.collectBids(driver, logger)
+				print(scroll_count, "Bid data collected")
 			page_height = int(driver.execute_script('return Math.max( document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );'))
 			try:
 				driver.execute_script("window.scrollTo(0, {});".format(i))
@@ -241,6 +247,12 @@ def perform_bot_mitigation(driver):
 			scroll_count += 1
 			if scroll_count > SCROLL_MAX:
 				break;
+			if scroll_count%5 == 0:
+				# Perform bid collection
+				bid_file_path = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_bids.json")
+				bid_object = BidCollector(profile, hb_domain, hb_rank, bid_file_path)
+				bid_object.collectBids(driver, logger)
+				print(scroll_count, "Bid data collected")
 			page_height = int(driver.execute_script('return Math.max( document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );'))
 			try:
 				driver.execute_script("window.scrollTo(0, {});".format(i))
@@ -331,10 +343,11 @@ def main(args):
 		print("Chromedriver loading issue: " + str(error))
 		exit()
 
-	print("\nChromedriver successfully loaded!")
+	print("\nChromedriver successfully loaded for" , profile )
 
 	for iteration in [1, 2, 3]:
 		for idx, (hb_domain, hb_rank) in enumerate(hb_dict.items()):
+			print("i" , profile, "has moved to next")
 			
 			# if iteration >= 3 and hb_domain == "google.com":
 			# 	continue
@@ -346,20 +359,20 @@ def main(args):
 			# 	continue
 			
 			start_time = time.time()
-			print("\n\nStarting to crawl:", iteration, idx, hb_domain, hb_rank)
-	
+			print("\n\nStarting to crawl:", iteration, idx, hb_domain, hb_rank , "for" , profile)
+
 			experimental_path = os.path.join(ROOT_DIRECTORY, "output", profile, str(hb_domain)+"_"+str(iteration))
 			if not(os.path.exists(experimental_path)):
 				os.makedirs(experimental_path)
-	
-	
+
+
 			# Log issues and crawl progress in this file
 			logger = open(os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_logs.txt"), "w")
 			ct = datetime.datetime.now()
 			logger.write("\n\nCrawl {} Start Time: {} [TS:{}] [{}]".format(iteration, ct, ct.timestamp(), hb_domain))
 			print("Error logging started ...")
 			
-	
+
 			# Start the chromedriver instance
 			'''
 			current_time = time.time()
@@ -371,50 +384,52 @@ def main(args):
 			logger.write("\nChromedriver successfully loaded! [Time: {}]".format(time.time()-current_time))
 			print("\nChromedriver successfully loaded!")
 			'''
-	
-	
-			# Visit the current domain
-			current_time = time.time()
-			website = "https://" + str(hb_domain)
-			try:
-				print("Website:", website)
-				# driver.get(website)
-				
-				# Threading to open the URL and wait for a maximum of timeout seconds
-				done_flag = threading.Event()
-				thread = threading.Thread(target=open_url, args=(website, driver, done_flag))
-				thread.start()
-
-				# Timeout for each URL (in seconds) before moving to next URL
-				timeout = 120
-				
-				# Wait for the thread to finish or until the timeout is reached
-				thread.join(timeout)
-				
-				# If the thread is still running (URL not loaded within timeout), stop it and proceed
-				if not done_flag.is_set():
-					print(time.time(), "Timed out while trying to load")
-					logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 120secs occurred while getting the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
-					raise BaseException("Raising BaseException while getting URL due to timeout issue")
-				else:
-					print(f"Successfully loaded: {website}")
-					logger.write("\nSuccessfully got the webpage ... [Time: {}]".format(time.time()-current_time))
-					pass
-			except BaseException as e:
-				logger.write("\n[ERROR] main()::ad-crawler: {}\nException occurred while getting the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
-				'''
+			attempt = 0
+			while(1):
+				# Visit the current domain
+				current_time = time.time()
+				website = "https://" + str(hb_domain)
 				try:
-					driver.quit()
-				except:
-					print("\n[ERROR] main()::Webdriver-Intitialization: {}".format(str(traceback.format_exc())))
-					logger.write("\n[ERROR] main()::Webdriver-Intitialization: {} for domain: {} in Iteration: {}| {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
-					continue
-				'''
-				continue
-			print("\nChromedriver successfully loaded website!")
+					print("Website:", website , "for" , profile)
+					# driver.get(website)
+					
+					# Threading to open the URL and wait for a maximum of timeout seconds
+					done_flag = threading.Event()
+					thread = threading.Thread(target=open_url, args=(website, driver, done_flag))
+					thread.start()
+
+					# Timeout for each URL (in seconds) before moving to next URL
+					timeout = 120
+					
+					# Wait for the thread to finish or until the timeout is reached
+					thread.join(timeout)
+					
+					# If the thread is still running (URL not loaded within timeout), stop it and proceed
+					if not done_flag.is_set():
+						print(time.time(), "Timed out while trying to load" , website , "for" , profile)
+						logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 120secs occurred while getting the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
+						raise BaseException("Raising BaseException while getting URL due to timeout issue")
+					else:
+						print(f"Successfully loaded: {website} for" , profile)
+						logger.write("\nSuccessfully got the webpage ... [Time: {}]".format(time.time()-current_time))
+						pass
+					break
+				except BaseException as e:
+					logger.write("\n[ERROR] main()::ad-crawler: {}\nException occurred while getting the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
+					attempt+=1
+					'''
+					try:
+						driver.quit()
+					except:
+						print("\n[ERROR] main()::Webdriver-Intitialization: {}".format(str(traceback.format_exc())))
+						logger.write("\n[ERROR] main()::Webdriver-Intitialization: {} for domain: {} in Iteration: {}| {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
+						continue
+					'''
+			
+			print("\nChromedriver successfully loaded website for" , profile)
 			# Wait for page to completely load
 			sleep(10)
-			print("Visiting and loading webpage ...")
+			print("Visiting and loading webpage ... for" , profile)
 			logger.write("\nVisiting and loading webpage ... [Time: {}]".format(time.time()-current_time))
 			
 			# if hb_domain == "google.com":
@@ -427,8 +442,8 @@ def main(args):
 			prules = f.read().split("\n")
 			f.close()
 			prule_dict = {prule.split(" | ")[0]: list(prule.split(" | ")[1:]) for prule in prules}
-	
-	
+
+
 			cpm = CustomPopupManager(hb_domain, prule_dict)
 			pop_flag = threading.Event()
 			thread = threading.Thread(target=handle_popups, args=(cpm, driver, pop_flag))
@@ -437,15 +452,15 @@ def main(args):
 			thread.join(timeout)
 			# If the thread is still running, stop it and proceed
 			if not pop_flag.is_set():
-				print(time.time(), "Timed out while trying to give consent!")
+				print(time.time(), "Timed out while trying to give consent for" , profile)
 				logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 200secs occurred while handling consent in managePopups() for the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
 			else:
-				print("Successfully completed managePopups()")
+				print("Successfully completed managePopups() for" , profile)
 				logger.write("\nSuccessfully completed managePopups() ... [Time: {}]".format(time.time()-current_time))
 				pass
 			# cpm.managePopups(driver)
-	
-	
+
+
 			consent_flag = threading.Event()
 			thread = threading.Thread(target=handle_consent, args=(cpm, driver, consent_flag))
 			thread.start()
@@ -453,17 +468,17 @@ def main(args):
 			thread.join(timeout)
 			# If the thread is still running, stop it and proceed
 			if not consent_flag.is_set():
-				print(time.time(), "Timed out while trying to give consent!")
+				print(time.time(), "Timed out while trying to give consent for" , profile)
 				logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 200secs occurred while handling consent in acceptMissedConsents() for the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
 			else:
-				print("Successfully completed acceptMissedConsents()")
+				print("Successfully completed acceptMissedConsents() for " , profile)
 				logger.write("\nSuccessfully completed acceptMissedConsents() ... [Time: {}]".format(time.time()-current_time))
 				pass
 			# cpm.acceptMissedConsents(driver)
 			
 			logger.write("\nPopup-Consent-1 handled!")
 			# exploreFullPage(driver)
-			perform_bot_mitigation(driver)
+			perform_bot_mitigation(driver, profile, hb_domain, hb_rank, experimental_path, iteration, logger)
 			logger.write("\nWebpage explored fully.")
 			
 			consent_flag = threading.Event()
@@ -471,17 +486,18 @@ def main(args):
 			thread.start()
 			timeout = 150
 			thread.join(timeout)
+
 			# If the thread is still running, stop it and proceed
 			if not consent_flag.is_set():
-				print(time.time(), "Timed out while trying to give consent!")
+				print(time.time(), "Timed out while trying to give consent for" , profile)
 				logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 200secs occurred while handling consent in acceptMissedConsents() for the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
 			else:
-				print("Successfully completed acceptMissedConsents()")
+				print("Successfully completed acceptMissedConsents() for", profile)
 				logger.write("\nSuccessfully completed acceptMissedConsents() ... [Time: {}]".format(time.time()-current_time))
 				pass
 			# cpm.acceptMissedConsents(driver)
-	
-	
+
+
 			pop_flag = threading.Event()
 			thread = threading.Thread(target=handle_popups, args=(cpm, driver, pop_flag))
 			thread.start()
@@ -489,15 +505,15 @@ def main(args):
 			thread.join(timeout)
 			# If the thread is still running, stop it and proceed
 			if not pop_flag.is_set():
-				print(time.time(), "Timed out while trying to give consent!")
+				print(time.time(), "Timed out while trying to give consent for" , profile)
 				logger.write("\n[TIMEOUT] main()::ad-crawler: {}\nTimeout of 200secs occurred while handling consent in managePopups() for the domain: {} in Iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
 			else:
-				print("Successfully completed managePopups()")
+				print("Successfully completed managePopups() for" , profile)
 				logger.write("\nSuccessfully completed managePopups() ... [Time: {}]".format(time.time()-current_time))
 				pass
 			# cpm.managePopups(driver)
 			logger.write("\nPopup-Consent-2 handled! [Time: {}]".format(time.time()-current_time))
-	
+
 			'''
 			# Read filterlist rules
 			f = open(os.path.join(ROOT_DIRECTORY, "data", "EasyList", "easylist.txt"), "r")
@@ -505,27 +521,27 @@ def main(args):
 			f.close()
 			rules = [rule[2:] for rule in rules[18:] if rule.startswith("##")]
 			'''
-	
-			# Save DOM of the webpage
-			current_time = time.time()
-			try:
-				dom_filepath = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_DOM.html")
-				fdom = codecs.open(dom_filepath, "w", "utf−8")
-				fdom.write(driver.page_source)
-				fdom.close()
-				logger.write("\nDOM saved. [Time: {}]".format(time.time()-current_time))
-				print("DOM saved")
-			except BaseException as e:
-				print("\n[ERROR] DOM-Capture: {}".format(str(traceback.format_exc())))
-				logger.write("\n[ERROR] main()::DOM-Capture: {} for domain: {} in iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
-				pass
-	
-	
+
+			# # Save DOM of the webpage
+			# current_time = time.time()
+			# try:
+			# 	dom_filepath = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_DOM.html")
+			# 	fdom = codecs.open(dom_filepath, "w", "utf−8")
+			# 	fdom.write(driver.page_source)
+			# 	fdom.close()
+			# 	logger.write("\nDOM saved. [Time: {}]".format(time.time()-current_time))
+			# 	print("DOM saved i am " , profile)
+			# except BaseException as e:
+			# 	print("\n[ERROR] DOM-Capture: {}".format(str(traceback.format_exc())) , "i am", profile)
+			# 	logger.write("\n[ERROR] main()::DOM-Capture: {} for domain: {} in iteration: {} | {} [Time: {}]".format(str(traceback.format_exc()), hb_domain, iteration, profile, time.time()-current_time))
+			# 	pass
+
+
 			# Perform bid collection
 			bid_file_path = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_bids.json")
 			bid_object = BidCollector(profile, hb_domain, hb_rank, bid_file_path)
 			bid_object.collectBids(driver, logger)
-			print("Bid data collected")
+			print("Bid data collected I am" , profile)
 			
 			
 			# Take fullpage screenshot of the webpage
@@ -539,8 +555,8 @@ def main(args):
 			except:
 				pass
 			sleep(10)
-			print("Fullpage screenshot of the webpage captured")
-	
+			print("Fullpage screenshot of the webpage captured I am" , profile)
+
 			
 			'''			
 			# Collect ads on the website
@@ -548,13 +564,13 @@ def main(args):
 			ad_path = os.path.join(experimental_path, "ads")
 			if not(os.path.exists(ad_path)):
 				os.makedirs(ad_path)
-	
+
 			EASYLIST_DIR = os.path.join(ROOT_DIRECTORY, "data", "EasyList")
 			ad_object = AdCollector(profile, iteration, hb_domain, hb_rank, rules, ad_path, EASYLIST_DIR, logger)
 			ad_object.collectAds(driver)
 			print("Ad collection complete!")
-	
-	
+
+
 			# Take fullpage screenshot of the webpage
 			current_time = time.time()
 			screenshot_output_path = os.path.join(experimental_path, str(hb_domain)+"_"+str(iteration)+"_ss-after.png")
@@ -568,14 +584,14 @@ def main(args):
 				pass
 			print("Fullpage screenshot of the webpage captured")
 			'''
-	
-	
+
+
 			end_time = time.time()
 			total_time = end_time - start_time
-			print("Total time to crawl domain: {} in Iteration: {} is {}".format(hb_domain, iteration, total_time))
+			print("Total time to crawl domain: {} in Iteration: {} is {}".format(hb_domain, iteration, total_time), "i am" , profile)
 			logger.write("\nTotal time to crawl domain: {} in Iteration: {} is {}\n".format(hb_domain, iteration, total_time))
-	
-	
+			print("i" , profile, "is moving to next")
+
 	driver.quit()
 	
 	# End

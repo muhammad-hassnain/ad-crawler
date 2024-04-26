@@ -41,10 +41,17 @@ EXPOSE 1212 5000
 # Set the PATH environment variable to include the directory where scripts are located
 ENV PATH="/crawler:${PATH}"
 
-# Command to run when starting the container
+# Set environment variable for the VNC password file path
+ENV VNC_PASSWORD_FILE="/crawler/file"
+
+# Set the VNC password
+RUN x11vnc -storepasswd common456 $VNC_PASSWORD_FILE
+
+# Modify the CMD to include the password file
 CMD Xvfb :99 -screen 0 1024x768x16 & \
     dbus-launch fluxbox & \
-    x11vnc -display :99 -N -forever -ncache_cr -rfbport 1212 & \
+    x11vnc -display :99 -N -forever -ncache_cr -rfbport 1212 -rfbauth $VNC_PASSWORD_FILE & \
     flask run --host=0.0.0.0 --port=5000 & \
     sleep 5 && \
     google-chrome --no-sandbox --disable-gpu --start-maximized "http://localhost:5000"
+
